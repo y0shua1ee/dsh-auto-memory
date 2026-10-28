@@ -54,7 +54,7 @@ metadata:
 - `metadata.type` 取 `user`（用户是谁）、`feedback`（对工作方式的纠正或认可）、`project`（仓库里没记录的进行中工作、目标、约束）、`reference`（外部资源指针）之一；也接受顶层 `type:`。
 - `feedback` 和 `project` 在正文后跟 **Why:** / **How to apply:** 两行，便于模型在边界情况自行判断。
 - `[[name]]` 指向 `/memories/<name>.md`，所以文件名应与 `name` 一致（kebab-case，与 DSH skill 名规则相同）。链接到尚不存在的记忆是允许的，表示“值得以后补写”。
-- frontmatter 不是强制的：缺字段时 `create` 照常写入，只在工具输出里列出缺什么。frontmatter 只解析扁平的 `key: value` 和一层 `metadata:`，不是完整 YAML。
+- frontmatter 不是强制的：缺字段、`name` 与文件名不一致时照常写入，只在工具输出里列出问题；`create` 列出全部问题，`str_replace` / `insert` / `rename` 只列出这次改动新引入的问题。`name` 不是合法 kebab-case 时，索引标题退回文件名。frontmatter 只解析扁平的 `key: value` 和一层 `metadata:`，不是完整 YAML。
 
 项目目录名与 DSH 的 session 目录规则一致（`--` + 路径转义 + `--`），所以 `~/.dsh/sessions/` 和 `~/.dsh/auto-memory/` 可以对照着看。
 
@@ -162,7 +162,7 @@ pnpm install --prefer-offline
 | `str_replace` | `path`、`old_str`、`new_str` | `old_str` 必须恰好出现一次 |
 | `insert` | `path`、`insert_line`、`insert_text` | `insert_line` 从 0 开始，0 表示插到第一行之前 |
 | `delete` | `path` | 删除文件，并清掉索引里的对应行 |
-| `rename` | `path`、`new_path` | 重命名，并同步索引链接；不允许改名 `MEMORY.md` |
+| `rename` | `path`、`new_path` | 重命名，并同步索引链接；仍由旧文件名生成的标题随之更新；不允许改名 `MEMORY.md` |
 
 示例：
 
@@ -176,7 +176,7 @@ pnpm install --prefer-offline
 - [prefer-pnpm](prefer-pnpm.md) — 这个仓库只用 pnpm，不用 npm
 ```
 
-之后用 `str_replace` / `insert` 改了 `name` 或 `description`，索引行会跟着更新；但若这一行的标题或说明已被手改（不再等于旧值），那一部分保持不动。
+之后用 `str_replace` / `insert` 改了 `name` 或 `description`，索引行会跟着更新；但若这一行的标题或说明已被手改（不再等于旧值），那一部分保持不动。索引维护只认行首的 `- [标题](文件)` 链接，说明里出现的其他 Markdown 链接不会被当成索引项。
 
 ## Rules（兼容 Claude Code）
 
@@ -251,7 +251,7 @@ paths:
 
 ```bash
 cd dsh-auto-memory
-node --test test/store.test.mjs test/render-paths.test.mjs test/rules.test.mjs
+node --test test/store.test.mjs test/memory-frontmatter.test.mjs test/render-paths.test.mjs test/rules.test.mjs
 ```
 
 插件装配与注入的集成测试需要一份 DSH 运行时。先解出安装包（默认写到 `/tmp/dsh-app`，原生模块会从 `app.asar.unpacked` 合并）：

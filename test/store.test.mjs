@@ -160,7 +160,7 @@ test("frontmatter names the index entry and missing fields are reported", async 
   assert.deepEqual((await store.create("plain.md", "# Plain\n")).frontmatterProblems, [
     "no frontmatter (name, description, metadata.type)"
   ]);
-  assert.match((await store.view("MEMORY.md")).content, /- \[Loose Note\]\(loose\.md\) — body\n/);
+  assert.match((await store.view("MEMORY.md")).content, /- \[loose\]\(loose\.md\) — body\n/);
 });
 
 test("edits refresh index lines that still match the old frontmatter", async () => {
@@ -181,4 +181,39 @@ test("edits refresh index lines that still match the old frontmatter", async () 
   const index = (await store.view("MEMORY.md")).content;
   assert.match(index, /- \[synced\]\(synced\.md\) — new hook\n/);
   assert.match(index, /- \[renamed\]\(custom\.md\) — written by hand\n/);
+});
+
+test("index lines are identified by their leading link only", async () => {
+  const { root, store } = await fixture();
+  await store.create("a.md", "---\nname: a\ndescription: See [b](b.md) for context\n---\n");
+  assert.equal((await store.create("b.md", "---\nname: b\ndescription: bee\n---\n")).indexed, true);
+  await store.rename("b.md", "c.md");
+  await store.delete("c.md");
+  assert.match((await store.view("MEMORY.md")).content, /- \[a\]\(a\.md\) — See \[b\]\(b\.md\) for context\n/);
+
+  await store.create("crlf.md", "---\nname: crlf\ndescription: old\n---\n");
+  const index = join(root, "MEMORY.md");
+  await writeFile(index, (await readFile(index, "utf8")).replaceAll("\n", "\r\n"));
+  assert.equal((await store.strReplace("crlf.md", "description: old", "description: new")).indexed, true);
+  assert.match(await readFile(index, "utf8"), /- \[crlf\]\(crlf\.md\) — new\r\n/);
+});
+
+test("names must match file names and renames carry generated titles", async () => {
+  const { store } = await fixture();
+  const memory = (name) => `---\nname: ${name}\ndescription: d\nmetadata:\n  type: user\n---\n`;
+  assert.match((await store.create("actual.md", memory("other"))).frontmatterProblems[0], /does not match the file name actual\.md/);
+  assert.deepEqual((await store.create("odd.md", memory("a]b"))).frontmatterProblems, ['name "a]b" is not kebab-case']);
+  await store.create("plain.md", "# Plain\n");
+  await store.create("keep.md", memory("keep"));
+  await store.rename("plain.md", "renamed.md");
+  const moved = await store.rename("keep.md", "moved.md");
+  assert.match(moved.frontmatterProblems[0], /name "keep" does not match the file name moved\.md/);
+  const edited = await store.strReplace("moved.md", "type: user", "type: todo");
+  assert.deepEqual(edited.frontmatterProblems, ['metadata.type "todo" is not one of user, feedback, project, reference']);
+  assert.deepEqual((await store.insert("renamed.md", 1, "more")).frontmatterProblems, []);
+
+  const index = (await store.view("MEMORY.md")).content;
+  assert.match(index, /- \[odd\]\(odd\.md\) — d\n/);
+  assert.match(index, /- \[renamed\]\(renamed\.md\) — Plain\n/);
+  assert.match(index, /- \[keep\]\(moved\.md\) — d\n/);
 });

@@ -28,7 +28,7 @@ Use Node 22 or newer. The packaged desktop app ships its own Node under its runt
 
 ```bash
 # pure logic
-node --test test/store.test.mjs test/render-paths.test.mjs test/rules.test.mjs
+node --test test/store.test.mjs test/memory-frontmatter.test.mjs test/render-paths.test.mjs test/rules.test.mjs
 
 # extract the packaged runtime once (writes /tmp/dsh-app by default)
 node scripts/extract-runtime.mjs
@@ -65,7 +65,7 @@ The integration loader maps `@deepseek-ai/*` to the packaged app because this di
 
 - `maxFiles` counts `MEMORY.md` too.
 - `create` auto-creates `MEMORY.md` when a topic file is the first memory.
-- Memory files follow Claude Code's format (one fact per file, `name` / `description` / `metadata.type` frontmatter, `[[name]]` → `/memories/<name>.md`). Frontmatter is advisory: `create` never refuses a file for it, it only lists problems in the tool output. New index lines take `name` and `description`, falling back to the file name and first body line. `str_replace` / `insert` on a topic file refresh its index line's title and hook only where they still equal the old generated values; hand-written parts are kept.
+- Memory files follow Claude Code's format (one fact per file, `name` / `description` / `metadata.type` frontmatter, `[[name]]` → `/memories/<name>.md`). Frontmatter is advisory: no command refuses a file for it. `create` lists every problem (including a `name` that differs from the file name); `str_replace` / `insert` / `rename` list only problems they introduced. An invalid `name` never becomes an index title; the file name is used instead. New index lines take `name` and `description`, falling back to the file name and first body line. `str_replace` / `insert` on a topic file refresh its index line's title and hook only where they still equal the old generated values; hand-written parts are kept. Index maintenance identifies a line only by its leading `- [title](target)` link (CRLF tolerated), never by a substring, so links inside a hook are ignored.
 - `str_replace` requires exactly one occurrence; `insert` is 0-based and clamps to the line count.
 - Rules are re-discovered every pre-step with an mtime/size cache; a changed rule re-injects with a new digest.
 - The desktop app's `$DSH_HOME/profiles/desktop` installs `@y0shua1ee/dsh-auto-memory` from npm, so repo changes reach it only after a publish and an update of that profile; **code changes need an app restart**, config changes can hot-reload.

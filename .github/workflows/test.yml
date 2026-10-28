@@ -18,6 +18,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Pure tests
-        run: node --test test/store.test.mjs test/render-paths.test.mjs test/rules.test.mjs
+        run: node --test test/store.test.mjs test/memory-frontmatter.test.mjs test/render-paths.test.mjs test/rules.test.mjs
       - name: Integration tests (skipped without a DSH runtime)
         run: node --test test/plugin.test.mjs test/rules-plugin.test.mjs
