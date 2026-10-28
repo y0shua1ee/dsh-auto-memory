@@ -1,5 +1,7 @@
 # dsh-auto-memory
 
+[![test](https://github.com/y0shua1ee/dsh-auto-memory/actions/workflows/test.yml/badge.svg)](https://github.com/y0shua1ee/dsh-auto-memory/actions/workflows/test.yml)
+
 给 DeepSeek Harness（DSH）加一层 **Claude Code 式的项目记忆与规则**：
 
 - 一个 `memory` 工具、一个每次会话自动注入的 `MEMORY.md` 索引，以及一个按项目隔离的磁盘目录；
@@ -41,14 +43,17 @@
 
 - 本地目录的绝对路径（例如 `~/Documents/dev/active/dsh-auto-memory`）。
 
-> npm 包名 `dsh-auto-memory` 已被另一个 DSH 插件占用（v1.2.0），本仓库发布前会改用唯一名称；当前请用本地目录安装。
+> npm 包名 `dsh-auto-memory` 已被另一个 DSH 插件占用（v1.2.0），本仓库发布前会改用唯一名称（scoped 或 `dsh-memory-rules`）；当前请用本地目录或 GitHub 仓库安装。
 
 本地目录会以 `link:` 形式写入当前 profile 的 `package.json`，并自动选中 bundle。安装完成后它应出现在 **已安装插件** 列表。
 
 ### 方式 B：命令行
 
 ```bash
+# 本地目录
 dsh plugin --profile <profile> add link:/absolute/path/to/dsh-auto-memory
+# GitHub
+dsh plugin --profile <profile> add git+https://github.com/y0shua1ee/dsh-auto-memory
 # npm 发布后：dsh plugin --profile <profile> add <published-name>
 ```
 
