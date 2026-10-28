@@ -1,6 +1,7 @@
 # dsh-auto-memory
 
 [![test](https://github.com/y0shua1ee/dsh-auto-memory/actions/workflows/test.yml/badge.svg)](https://github.com/y0shua1ee/dsh-auto-memory/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/@y0shua1ee/dsh-auto-memory.svg)](https://www.npmjs.com/package/@y0shua1ee/dsh-auto-memory)
 
 给 DeepSeek Harness（DSH）加一层 **Claude Code 式的项目记忆与规则**：
 
