@@ -10,6 +10,7 @@ File-based persistent project memory for DeepSeek Harness (DSH). This repo is a 
 | `lib/config.js` | Schemastery `Config`, direct-apply normalization, `$DSH_HOME` root resolution |
 | `lib/paths.js` | DSH-compatible `projectKey`, `.git` root discovery, path display |
 | `lib/store.js` | virtual `/memories` filesystem, atomic writes, limits, symlink/traversal guards, index maintenance |
+| `lib/memory-frontmatter.js` | memory-file frontmatter parser (`name`, `description`, `metadata.type`) and non-blocking checks |
 | `lib/render.js` | bounded `MEMORY.md` snapshot, escaping, SHA-256 digest |
 | `lib/guidance.js` | system-prompt guidance |
 | `lib/tool.js` | `memory` tool options (no `defineTool` import, so command semantics are testable) |
@@ -64,6 +65,7 @@ The integration loader maps `@deepseek-ai/*` to the packaged app because this di
 
 - `maxFiles` counts `MEMORY.md` too.
 - `create` auto-creates `MEMORY.md` when a topic file is the first memory.
+- Memory files follow Claude Code's format (one fact per file, `name` / `description` / `metadata.type` frontmatter, `[[name]]` → `/memories/<name>.md`). Frontmatter is advisory: `create` never refuses a file for it, it only lists problems in the tool output. New index lines take `name` and `description`, falling back to the file name and first body line. `str_replace` / `insert` on a topic file refresh its index line's title and hook only where they still equal the old generated values; hand-written parts are kept.
 - `str_replace` requires exactly one occurrence; `insert` is 0-based and clamps to the line count.
 - Rules are re-discovered every pre-step with an mtime/size cache; a changed rule re-injects with a new digest.
 - The plugin is linked as `@y0shua1ee/dsh-auto-memory` in `$DSH_HOME/profiles/web` and `$DSH_HOME/profiles/desktop`; **code changes need an app restart**, config changes can hot-reload.

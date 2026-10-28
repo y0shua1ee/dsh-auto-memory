@@ -141,3 +141,44 @@ test("concurrent creates serialize and keep both index entries", async () => {
   const lines = index.content.split("\n").filter((line) => line.startsWith("- ["));
   assert.equal(lines.length, 2);
 });
+
+test("frontmatter names the index entry and missing fields are reported", async () => {
+  const { store } = await fixture();
+  const created = await store.create(
+    "prefer-pnpm.md",
+    "---\nname: prefer-pnpm\ndescription: \"Use pnpm, never npm\"\nmetadata:\n  type: feedback\n---\n\nUse pnpm.\n\n**Why:** lockfile.\n**How to apply:** installs.\n"
+  );
+  assert.deepEqual(created.frontmatterProblems, []);
+  assert.match((await store.view("MEMORY.md")).content, /- \[prefer-pnpm\]\(prefer-pnpm\.md\) — Use pnpm, never npm\n/);
+
+  const loose = await store.create("loose.md", "---\nname: Loose Note\nmetadata:\n  type: todo\n---\n\nbody\n");
+  assert.deepEqual(loose.frontmatterProblems, [
+    'name "Loose Note" is not kebab-case',
+    "missing description",
+    'metadata.type "todo" is not one of user, feedback, project, reference'
+  ]);
+  assert.deepEqual((await store.create("plain.md", "# Plain\n")).frontmatterProblems, [
+    "no frontmatter (name, description, metadata.type)"
+  ]);
+  assert.match((await store.view("MEMORY.md")).content, /- \[Loose Note\]\(loose\.md\) — body\n/);
+});
+
+test("edits refresh index lines that still match the old frontmatter", async () => {
+  const { store } = await fixture();
+  const memory = (name, description) =>
+    `---\nname: ${name}\ndescription: ${description}\nmetadata:\n  type: project\n---\n\nbody\n`;
+  await store.create("synced.md", memory("synced", "old hook"));
+  await store.create("custom.md", memory("custom", "old hook"));
+  await store.strReplace("MEMORY.md", "[custom](custom.md) — old hook", "[custom](custom.md) — written by hand");
+
+  const synced = await store.strReplace("synced.md", "description: old hook", "description: new hook");
+  assert.equal(synced.indexed, true);
+  const custom = await store.strReplace("custom.md", "name: custom\ndescription: old hook", "name: renamed\ndescription: new hook");
+  assert.equal(custom.indexed, true);
+  const unchanged = await store.insert("custom.md", 8, "more body");
+  assert.equal(unchanged.indexed, undefined);
+
+  const index = (await store.view("MEMORY.md")).content;
+  assert.match(index, /- \[synced\]\(synced\.md\) — new hook\n/);
+  assert.match(index, /- \[renamed\]\(custom\.md\) — written by hand\n/);
+});

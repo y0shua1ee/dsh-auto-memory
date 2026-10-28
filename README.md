@@ -19,8 +19,9 @@
 | Rules 兼容 | 读取 `~/.dsh/rules`、`~/.claude/rules`、项目 `.dsh/rules` / `.claude/rules`，支持 `paths:` 路径作用域 |
 | 去重 | 注入消息带渲染快照的 SHA-256；同一快照不重复注入，压缩后自动重注 |
 | 项目隔离 | 以最近的 `.git`（可配置）为项目根；没有标记时退回工作目录 |
-| 索引维护 | 新建/重命名/删除主题文件时，自动增删 `MEMORY.md` 中对应的链接行 |
-| 提示词引导 | 注册 `tool:memory` system-prompt section，写清该记什么、不该记什么 |
+| 记忆格式 | 与 Claude Code 一致：一条记忆一个文件，带 `name` / `description` / `metadata.type` frontmatter，`[[name]]` 互链 |
+| 索引维护 | 新建/重命名/删除记忆文件时，自动增删 `MEMORY.md` 中对应的链接行；行内容取自 frontmatter，编辑后自动同步 |
+| 提示词引导 | 注册 `tool:memory` system-prompt section，写清该记什么、不该记什么、怎么写 |
 
 ## 目录布局
 
@@ -28,9 +29,32 @@
 ~/.dsh/auto-memory/
 └── --Users-areslee-Documents-dev-active-my-project--/
     ├── MEMORY.md          # 索引：每条一行，注入会话
-    ├── testing.md         # 主题文件：细节
-    └── decisions.md
+    ├── prefer-pnpm.md     # 一条记忆一个文件，文件名即 name
+    └── release-freeze.md
 ```
+
+## 记忆格式
+
+格式与 Claude Code 的记忆文件相同：
+
+```markdown
+---
+name: prefer-pnpm
+description: 这个仓库只用 pnpm，不用 npm
+metadata:
+  type: feedback
+---
+
+安装依赖一律用 pnpm。
+
+**Why:** 仓库只提交了 pnpm-lock.yaml，npm 会生成另一份锁文件。
+**How to apply:** 安装、增删依赖、跑脚本时都用 pnpm；参见 [[release-freeze]]。
+```
+
+- `metadata.type` 取 `user`（用户是谁）、`feedback`（对工作方式的纠正或认可）、`project`（仓库里没记录的进行中工作、目标、约束）、`reference`（外部资源指针）之一；也接受顶层 `type:`。
+- `feedback` 和 `project` 在正文后跟 **Why:** / **How to apply:** 两行，便于模型在边界情况自行判断。
+- `[[name]]` 指向 `/memories/<name>.md`，所以文件名应与 `name` 一致（kebab-case，与 DSH skill 名规则相同）。链接到尚不存在的记忆是允许的，表示“值得以后补写”。
+- frontmatter 不是强制的：缺字段时 `create` 照常写入，只在工具输出里列出缺什么。frontmatter 只解析扁平的 `key: value` 和一层 `metadata:`，不是完整 YAML。
 
 项目目录名与 DSH 的 session 目录规则一致（`--` + 路径转义 + `--`），所以 `~/.dsh/sessions/` 和 `~/.dsh/auto-memory/` 可以对照着看。
 
@@ -143,16 +167,16 @@ pnpm install --prefer-offline
 示例：
 
 ```json
-{ "command": "create", "path": "/memories/testing.md", "file_text": "# Testing\n\n用 node --test。" }
+{ "command": "create", "path": "/memories/prefer-pnpm.md", "file_text": "---\nname: prefer-pnpm\ndescription: 这个仓库只用 pnpm，不用 npm\nmetadata:\n  type: feedback\n---\n\n安装依赖一律用 pnpm。\n" }
 ```
 
-新建主题文件后，索引里会自动出现：
+新建记忆文件后，索引里会自动出现（标题取 `name`、说明取 `description`；没有 frontmatter 时退回文件名和正文首行）：
 
 ```markdown
-- [testing](testing.md) — Testing
+- [prefer-pnpm](prefer-pnpm.md) — 这个仓库只用 pnpm，不用 npm
 ```
 
-模型仍应把这一行改写成有意钩子（“为什么这条值得记”），而不是保留自动生成的标题。
+之后用 `str_replace` / `insert` 改了 `name` 或 `description`，索引行会跟着更新；但若这一行的标题或说明已被手改（不再等于旧值），那一部分保持不动。
 
 ## Rules（兼容 Claude Code）
 
@@ -262,7 +286,8 @@ DSH_APP_NODE_MODULES=/tmp/dsh-app/dsh/node_modules \
 
 ## 设计来源
 
-- Claude Code 的 auto memory：`MEMORY.md` 索引 + 主题文件 + 模型主动写。
+- Claude Code 的 auto memory：`MEMORY.md` 索引 + 一条一文件 + `name` / `description` / `type` frontmatter + `[[name]]` 互链 + 模型主动写。
+- DSH 的 `dsh-skill-filesystem`：同样以 `name` + `description` frontmatter 描述可按需加载的 Markdown，名字规则沿用其 kebab-case。
 - Claude Code 的 rules：`.claude/rules/**/*.md` + `paths:` 路径作用域。
 - DSH 的 `dsh-agent-instructions`：`agent/pre-step` 注入、digest/可见性去重、surface 扫描。
 - DSH 的 `dsh-tool-goal`：`defineTool` 参数/输出 schema 与 `presentCall` 形状。
