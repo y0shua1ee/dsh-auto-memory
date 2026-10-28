@@ -1,0 +1,19 @@
+# Optional config override for the installed dsh-auto-memory bundle.
+# The bundle's own patch mounts the row; a profile patch only overrides it.
+- id: dsh-auto-memory
+  config:
+    root: "auto-memory"
+    maxIndexBytes: 25600
+    maxIndexLines: 200
+    maxFileBytes: 65536
+    maxFiles: 200
+    projectRootMarkers: [".git"]
+    inject: true
+    injectInSubagents: false
+    guidance: true
+    rules: true
+    userRuleDirs: ["~/.dsh/rules", "~/.claude/rules"]
+    projectRuleDirs: [".dsh/rules", ".claude/rules"]
+    maxRuleBytes: 65536
+    maxRulesBytes: 131072
+    maxRules: 100

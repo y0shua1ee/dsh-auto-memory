@@ -1,0 +1,23 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Pure tests
+        run: node --test test/store.test.mjs test/render-paths.test.mjs test/rules.test.mjs
+      - name: Integration tests (skipped without a DSH runtime)
+        run: node --test test/plugin.test.mjs test/rules-plugin.test.mjs
