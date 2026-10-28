@@ -1,6 +1,6 @@
 {
   "name": "@y0shua1ee/dsh-auto-memory",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Persistent project memory and Claude Code-compatible rules for DeepSeek Harness.",
   "type": "module",
   "main": "lib/index.js",
