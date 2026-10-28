@@ -125,7 +125,7 @@ pnpm install --prefer-offline
 
 ### 生效与验证
 
-- 插件代码通过 `link:` 加载；**更新代码后需要重启 DeepSeek Harness**，配置文件变更在 `patchReload: live` 的 profile 中可以热重组。
+- 插件代码在启动时加载：npm 安装的要先更新 profile 里的版本，`link:` 安装的直接读本地目录；两种情况**更新代码后都要重启 DeepSeek Harness**。配置文件变更在 `patchReload: live` 的 profile 中可以热重组。
 - 重启后在 **插件 → 已安装插件** 里应看到 `@y0shua1ee/dsh-auto-memory`，开关为开启状态。
 - 在会话里让 agent 调一次 `memory view /memories`，应返回空目录提示。
 - 让 agent 记住一条内容，检查 `~/.dsh/auto-memory/<projectKey>/MEMORY.md` 是否出现。
@@ -271,18 +271,15 @@ DSH_APP_NODE_MODULES=/tmp/dsh-app/dsh/node_modules \
 - 没有后台 LLM 提炼：记忆完全由模型在会话中主动写入，和 Claude Code 的 auto memory 一致。
 - Rules 只实现 `paths` 一个 frontmatter 字段，没有完整 YAML、`@import`、托管策略或 `/rules` 面板。
 - `paths` 目前只由 `read` / `write` / `edit` 触发；用 `bash cat/head` 读文件不会触发。
-- 不是 bundle：不会出现在 Web 的 Plugins 市场页，只能按上面的 row 方式挂载。
 - 一个 profile 一个 root；跨项目共享要自己写 `AGENTS.md` 或另开配置。
 - 依赖 DSH `0.2.1-rc.3` 的内部接口（`agent/pre-step`、`agent.inbox`、`defineTool`、`systemPrompt.section`）。DSH 升级后若接口变动，需要跟着改。
 - `MEMORY.md` 超过注入预算时只注入前 N 行/字节；完整内容要用 `memory view`。
 
 ## 卸载
 
-1. 从 `cordis.patch.yml` 删掉 `auto-memory` 的 insert 行。
-2. 从 profile 的 `package.json` 删掉 `@y0shua1ee/dsh-auto-memory` 依赖，执行 `pnpm install`。
+1. 在 **插件 → 已安装插件** 里移除 `@y0shua1ee/dsh-auto-memory`；或手动从 profile 的 `package.json` 删掉该依赖和 `dsh.profile.bundles` 里的同名条目，再执行 `pnpm install`。
+2. 如果在 profile 的 `cordis.patch.yml` 里覆盖过 `dsh-auto-memory` 的配置，一并删掉。
 3. 可选：删除 `~/.dsh/auto-memory/`（记忆文件不会自动删除）。
-
-代码目录本身可以保留，删除 profile 里的引用后不会加载。
 
 ## 设计来源
 
