@@ -41,9 +41,10 @@
 
 重启 DeepSeek Harness 后打开 **插件 → 添加插件**，输入：
 
-- 本地目录的绝对路径（例如 `~/Documents/dev/active/dsh-auto-memory`）。
+- 本地目录的绝对路径（例如 `~/Documents/dev/active/dsh-auto-memory`），或
+- npm 包名 `@y0shua1ee/dsh-auto-memory`。
 
-> npm 包名 `dsh-auto-memory` 已被另一个 DSH 插件占用（v1.2.0），本仓库发布前会改用唯一名称（scoped 或 `dsh-memory-rules`）；当前请用本地目录或 GitHub 仓库安装。
+> 无 scope 的 `dsh-auto-memory` 是另一个 DSH 插件（`AskTheWay/dsh-auto-memory`），不要安装那个；本仓库使用 scoped 包名。
 
 本地目录会以 `link:` 形式写入当前 profile 的 `package.json`，并自动选中 bundle。安装完成后它应出现在 **已安装插件** 列表。
 
@@ -54,10 +55,11 @@
 dsh plugin --profile <profile> add link:/absolute/path/to/dsh-auto-memory
 # GitHub
 dsh plugin --profile <profile> add git+https://github.com/y0shua1ee/dsh-auto-memory
-# npm 发布后：dsh plugin --profile <profile> add <published-name>
+# npm
+dsh plugin --profile <profile> add @y0shua1ee/dsh-auto-memory
 ```
 
-然后确认 profile 的 `package.json` 中 `dsh.profile.bundles` 含 `dsh-auto-memory`。
+然后确认 profile 的 `package.json` 中 `dsh.profile.bundles` 含 `@y0shua1ee/dsh-auto-memory`。
 
 ### 方式 C：手动配置
 
@@ -66,11 +68,11 @@ dsh plugin --profile <profile> add git+https://github.com/y0shua1ee/dsh-auto-mem
 ```json
 {
   "dependencies": {
-    "dsh-auto-memory": "link:/absolute/path/to/dsh-auto-memory"
+    "@y0shua1ee/dsh-auto-memory": "link:/absolute/path/to/dsh-auto-memory"
   },
   "dsh": {
     "profile": {
-      "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "dsh-auto-memory"]
+      "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "@y0shua1ee/dsh-auto-memory"]
     }
   }
 }
@@ -99,7 +101,7 @@ pnpm install --prefer-offline
 ### 生效与验证
 
 - 插件代码通过 `link:` 加载；**更新代码后需要重启 DeepSeek Harness**，配置文件变更在 `patchReload: live` 的 profile 中可以热重组。
-- 重启后在 **插件 → 已安装插件** 里应看到 `dsh-auto-memory`，开关为开启状态。
+- 重启后在 **插件 → 已安装插件** 里应看到 `@y0shua1ee/dsh-auto-memory`，开关为开启状态。
 - 在会话里让 agent 调一次 `memory view /memories`，应返回空目录提示。
 - 让 agent 记住一条内容，检查 `~/.dsh/auto-memory/<projectKey>/MEMORY.md` 是否出现。
 - 规则：在 `~/.claude/rules/` 或项目 `.claude/rules/` 放一个 `.md`，重启后新会话应自动注入；带 `paths:` 的规则在读写匹配文件后出现。
@@ -252,7 +254,7 @@ DSH_APP_NODE_MODULES=/tmp/dsh-app/dsh/node_modules \
 ## 卸载
 
 1. 从 `cordis.patch.yml` 删掉 `auto-memory` 的 insert 行。
-2. 从 profile 的 `package.json` 删掉 `dsh-auto-memory` 依赖，执行 `pnpm install`。
+2. 从 profile 的 `package.json` 删掉 `@y0shua1ee/dsh-auto-memory` 依赖，执行 `pnpm install`。
 3. 可选：删除 `~/.dsh/auto-memory/`（记忆文件不会自动删除）。
 
 代码目录本身可以保留，删除 profile 里的引用后不会加载。

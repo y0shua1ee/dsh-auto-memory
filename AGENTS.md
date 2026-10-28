@@ -1,6 +1,6 @@
 # dsh-auto-memory — agent notes
 
-File-based persistent project memory for DeepSeek Harness (DSH). This repo is a DSH **bundle plugin**: a profile selects `dsh-auto-memory` in `dsh.profile.bundles`, the package's `cordis.patch.yml` mounts the row, and framework packages stay peers.
+File-based persistent project memory for DeepSeek Harness (DSH). This repo is a DSH **bundle plugin**: a profile selects `@y0shua1ee/dsh-auto-memory` in `dsh.profile.bundles`, the package's `cordis.patch.yml` mounts the row, and framework packages stay peers.
 
 ## Layout
 
@@ -66,5 +66,5 @@ The integration loader maps `@deepseek-ai/*` to the packaged app because this di
 - `create` auto-creates `MEMORY.md` when a topic file is the first memory.
 - `str_replace` requires exactly one occurrence; `insert` is 0-based and clamps to the line count.
 - Rules are re-discovered every pre-step with an mtime/size cache; a changed rule re-injects with a new digest.
-- The plugin is linked into `$DSH_HOME/profiles/web` and `$DSH_HOME/profiles/desktop`; **code changes need an app restart**, config changes can hot-reload.
-- The bundle patch entry id is `dsh-auto-memory`; profile overrides address that id, not the old row id `auto-memory`.
+- The plugin is linked as `@y0shua1ee/dsh-auto-memory` in `$DSH_HOME/profiles/web` and `$DSH_HOME/profiles/desktop`; **code changes need an app restart**, config changes can hot-reload.
+- The bundle patch entry id is `dsh-auto-memory`; the package/row name is `@y0shua1ee/dsh-auto-memory`. Profile overrides address the id `dsh-auto-memory`, not the old row id `auto-memory`.

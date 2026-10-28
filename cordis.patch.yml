@@ -1,8 +1,8 @@
 # dsh-auto-memory bundle patch.
 #
-# The entry id matches the package name so store submission and profile
-# overrides can address it unambiguously. Selecting this bundle in
-# `dsh.profile.bundles` mounts the memory tool and the rule loader.
+# The row id stays readable and stable for profile overrides; the module name
+# is the scoped npm package. Selecting this bundle in `dsh.profile.bundles`
+# mounts the memory tool and the rule loader.
 - insert:
     - id: dsh-auto-memory
-      name: 'dsh-auto-memory'
+      name: '@y0shua1ee/dsh-auto-memory'
