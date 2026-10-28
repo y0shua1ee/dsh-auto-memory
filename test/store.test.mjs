@@ -55,6 +55,8 @@ test("str_replace requires exactly one match", async () => {
     store.strReplace("notes.md", "missing", "x"),
     (error) => error instanceof MemoryError && error.code === "MEMORY_NO_MATCH"
   );
+  await store.strReplace("notes.md", "BETA", "$& $$ $`");
+  assert.equal(await readFile(join(store.root, "notes.md"), "utf8"), "alpha $& $$ $` gamma\n");
   await store.create("dup.md", "same same\n");
   await assert.rejects(
     store.strReplace("dup.md", "same", "x"),
