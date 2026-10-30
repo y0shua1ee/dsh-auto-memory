@@ -53,8 +53,9 @@ metadata:
 
 - `metadata.type` 取 `user`（用户是谁）、`feedback`（对工作方式的纠正或认可）、`project`（仓库里没记录的进行中工作、目标、约束）、`reference`（外部资源指针）之一；也接受顶层 `type:`。
 - `feedback` 和 `project` 在正文后跟 **Why:** / **How to apply:** 两行，便于模型在边界情况自行判断。
-- `[[name]]` 指向 `/memories/<name>.md`，所以文件名应与 `name` 一致（kebab-case，与 DSH skill 名规则相同）。链接到尚不存在的记忆是允许的，表示“值得以后补写”。
-- frontmatter 不是强制的：缺字段、`name` 与文件名不一致时照常写入，只在工具输出里列出问题；`create` 列出全部问题，`str_replace` / `insert` / `rename` 只列出这次改动新引入的问题。`name` 不是合法 kebab-case 时，索引标题退回文件名。frontmatter 只解析扁平的 `key: value` 和一层 `metadata:`，不是完整 YAML。
+- `[[name]]` 指向顶层 `/memories/<name>.md`，所以只有顶层文件的 `name` 能直接解析。子目录里的记忆（如 `sub/foo.md`）即使 `name: foo` 也会提示：`[[foo]]` 指向的是 `/memories/foo.md`，不是 `sub/foo.md`；需要互链时请把记忆放在顶层，或自己在正文里写完整路径。链接到尚不存在的记忆仍然允许，表示“值得以后补写”。
+- frontmatter 不是强制的：缺字段、`name` 与文件名不一致、文件在子目录时照常写入，只在工具输出里列出问题。`create` 列出全部问题；`str_replace` / `insert` / `rename` 只列出这次改动新引入的问题**类型**，所以把一个非法值换成另一个非法值不会重复报。`name` 不是合法 kebab-case 时索引标题退回文件名；v0.3.0 遗留的非法标题（内容里的 `name` 仍是那个非法值时）会在下一次编辑或 rename 时按 legacy 标题识别并归一化。frontmatter 只解析扁平的 `key: value` 和一层 `metadata:`，不是完整 YAML。
+- 记忆文件名允许空格等空白字符；索引链接会写成 `[标题](<my note.md>)`，维护逻辑按行首链接的 target 精确匹配。说明或标题里的其他链接、`- [ ]` 任务列表不会被当成索引项。
 
 项目目录名与 DSH 的 session 目录规则一致（`--` + 路径转义 + `--`），所以 `~/.dsh/sessions/` 和 `~/.dsh/auto-memory/` 可以对照着看。
 
@@ -176,7 +177,7 @@ pnpm install --prefer-offline
 - [prefer-pnpm](prefer-pnpm.md) — 这个仓库只用 pnpm，不用 npm
 ```
 
-之后用 `str_replace` / `insert` 改了 `name` 或 `description`，索引行会跟着更新；但若这一行的标题或说明已被手改（不再等于旧值），那一部分保持不动。索引维护只认行首的 `- [标题](文件)` 链接，说明里出现的其他 Markdown 链接不会被当成索引项。
+之后用 `str_replace` / `insert` 改了 `name` 或 `description`，索引行会跟着更新；但若这一行的标题或说明已被手改（不再等于旧值），那一部分保持不动。索引维护只解析行首的 `[标题](文件)` 链接，target 精确匹配；含空白的 target 写成 `<...>`，标题里的嵌套链接按括号配对处理，任务列表会被忽略。CRLF 索引在 create / edit / delete / rename 下都保留原有行尾。
 
 ## Rules（兼容 Claude Code）
 
