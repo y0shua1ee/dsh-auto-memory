@@ -40,7 +40,7 @@ DSH_APP_NODE_MODULES=/tmp/dsh-app/dsh/node_modules \
 
 The integration loader maps `@deepseek-ai/*` to the packaged app because this directory has no `node_modules` and the plugin declares peers only.
 
-## DSH interfaces used (0.2.1-rc.3)
+## DSH interfaces used (tested on 0.2.1-rc.3 through 0.2.1-rc.5)
 
 - `ctx.tools.register(defineTool({...}))` — `@deepseek-ai/dsh-tools`
 - `ctx.systemPrompt.section({name, order, text})`, `getSectionOrder("TOOL_GOAL")`

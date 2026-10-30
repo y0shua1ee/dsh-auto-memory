@@ -1,6 +1,6 @@
 {
   "name": "@y0shua1ee/dsh-auto-memory",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Persistent project memory and Claude Code-compatible rules for DeepSeek Harness.",
   "type": "module",
   "main": "lib/index.js",
@@ -29,9 +29,9 @@
     "agent"
   ],
   "peerDependencies": {
-    "@deepseek-ai/dsh-home-paths": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-llm": "0.2.1-rc.3",
-    "@deepseek-ai/dsh-tools": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-home-paths": "^0.2.1-rc.3",
+    "@deepseek-ai/dsh-llm": "^0.2.1-rc.3",
+    "@deepseek-ai/dsh-tools": "^0.2.1-rc.3",
     "@deepseek-ai/schemastery": "~3.18.5"
   },
   "peerDependenciesMeta": {
