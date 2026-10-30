@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { memoryFrontmatterProblems, parseMemory } from "../lib/memory-frontmatter.js";
+import { memoryFrontmatterIssues, memoryFrontmatterProblems, parseMemory } from "../lib/memory-frontmatter.js";
 
 test("parseMemory reads name, description and metadata.type", () => {
   assert.deepEqual(
@@ -31,5 +31,30 @@ test("memoryFrontmatterProblems lists every missing or invalid field", () => {
   assert.deepEqual(
     memoryFrontmatterProblems(parseMemory("---\nname: a\ndescription: d\nmetadata:\n  type: user\n---\n")),
     []
+  );
+});
+
+test("frontmatter issues keep stable codes while only the value changes", () => {
+  const content = (name, type = "user") =>
+    `---\nname: ${name}\ndescription: d\nmetadata:\n  type: ${type}\n---\n`;
+  assert.deepEqual(
+    memoryFrontmatterIssues(parseMemory(content("bar")), "foo", "foo.md").map((issue) => issue.code),
+    ["name-unmatched"]
+  );
+  assert.deepEqual(
+    memoryFrontmatterIssues(parseMemory(content("baz")), "foo", "foo.md").map((issue) => issue.code),
+    ["name-unmatched"]
+  );
+  assert.deepEqual(
+    memoryFrontmatterIssues(parseMemory(content("foo")), "foo", "sub/foo.md").map((issue) => issue.code),
+    ["name-nested"]
+  );
+  assert.match(
+    memoryFrontmatterIssues(parseMemory(content("foo")), "foo", "sub/foo.md")[0].message,
+    /subdirectory/
+  );
+  assert.deepEqual(
+    memoryFrontmatterIssues(parseMemory(content("foo", "todo")), "foo", "foo.md").map((issue) => issue.code),
+    ["type-invalid"]
   );
 });

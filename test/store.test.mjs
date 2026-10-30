@@ -217,3 +217,131 @@ test("names must match file names and renames carry generated titles", async () 
   assert.match(index, /- \[renamed\]\(renamed\.md\) — Plain\n/);
   assert.match(index, /- \[keep\]\(moved\.md\) — d\n/);
 });
+
+test("paths with whitespace keep one maintainable index line", async () => {
+  const { store } = await fixture();
+  await store.create("my note.md", "# Note\n");
+  assert.match((await store.view("MEMORY.md")).content, /- \[my note\]\(<my note\.md>\) — Note\n/);
+
+  const edited = await store.strReplace("my note.md", "Note", "Note2");
+  assert.equal(edited.indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[my note\]\(<my note\.md>\) — Note2\n/);
+
+  const deleted = await store.delete("my note.md");
+  assert.equal(deleted.indexed, true);
+  assert.doesNotMatch((await store.view("MEMORY.md")).content, /my note\.md/);
+
+  await store.create("my note.md", "# Again\n");
+  const index = (await store.view("MEMORY.md")).content;
+  assert.equal(index.split("\n").filter((line) => line.includes("my note.md")).length, 1);
+
+  const renamed = await store.rename("my note.md", "my-note.md");
+  assert.equal(renamed.indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[my-note\]\(my-note\.md\) — Again\n/);
+
+  await store.create("my dir/foo.md", "# Foo\n");
+  assert.match((await store.view("MEMORY.md")).content, /- \[foo\]\(<my dir\/foo\.md>\) — Foo\n/);
+  assert.equal((await store.delete("my dir/foo.md")).indexed, true);
+
+  await store.create(
+    "my other note.md",
+    "---\nname: my-other-note\ndescription: d\nmetadata:\n  type: user\n---\n"
+  );
+  assert.equal((await store.rename("my other note.md", "my-other-note.md")).indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[my-other-note\]\(my-other-note\.md\) — d\n/);
+});
+
+test("creating an entry in a CRLF index preserves every line ending", async () => {
+  const { root, store } = await fixture();
+  await store.create("a.md", "# A\n");
+  const index = join(root, "MEMORY.md");
+  await writeFile(index, (await readFile(index, "utf8")).replaceAll("\n", "\r\n"));
+
+  await store.create("b.md", "# B\n");
+  const content = await readFile(index, "utf8");
+  assert.match(content, /- \[a\]\(a\.md\) — A\r\n/);
+  assert.match(content, /- \[b\]\(b\.md\) — B\r\n/);
+  assert.equal(
+    content.split("\n").filter((line) => line.length > 0 && !line.endsWith("\r")).length,
+    0
+  );
+});
+
+test("nested memory files warn that [[name]] only resolves at the root", async () => {
+  const { store } = await fixture();
+  const memory = (name) => `---\nname: ${name}\ndescription: d\nmetadata:\n  type: user\n---\n`;
+  const nested = await store.create("sub/nested.md", memory("nested"));
+  assert.match(nested.frontmatterProblems[0], /subdirectory/);
+  const top = await store.create("top.md", memory("top"));
+  assert.deepEqual(top.frontmatterProblems, []);
+
+  const moved = await store.rename("top.md", "sub/top.md");
+  assert.match(moved.frontmatterProblems[0], /subdirectory/);
+  const back = await store.rename("sub/top.md", "top.md");
+  assert.deepEqual(back.frontmatterProblems, []);
+});
+
+test("v0.3.0 invalid-name titles are normalized on edit and rename", async () => {
+  const { root, store } = await fixture();
+  await writeFile(join(root, "MEMORY.md"), "# Project memory\n\n- [Loose Note](loose.md) — new\n");
+  await store.create("loose.md", "---\nname: Loose Note\ndescription: new\nmetadata:\n  type: user\n---\n");
+  const edited = await store.strReplace("loose.md", "description: new", "description: newer");
+  assert.equal(edited.indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[loose\]\(loose\.md\) — newer\n/);
+
+  await writeFile(join(root, "MEMORY.md"), "# Project memory\n\n- [a]b](weird.md) — d\n");
+  await store.create("weird.md", "---\nname: a]b\ndescription: d\nmetadata:\n  type: user\n---\n");
+  const body = await store.strReplace("weird.md", "description: d", "description: d2");
+  assert.equal(body.indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[weird\]\(weird\.md\) — d2\n/);
+
+  await writeFile(join(root, "MEMORY.md"), "# Project memory\n\n- [Loose Note](loose2.md) — new\n");
+  await store.create("loose2.md", "---\nname: Loose Note\ndescription: new\nmetadata:\n  type: user\n---\n");
+  const moved = await store.rename("loose2.md", "moved.md");
+  assert.equal(moved.indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[moved\]\(moved\.md\) — new\n/);
+
+  await writeFile(join(root, "MEMORY.md"), "# Project memory\n\n- [Loose Note](loose3.md) — d\n");
+  await store.create("loose3.md", "---\nname: Loose Note\ndescription: d\nmetadata:\n  type: user\n---\n");
+  const renamed = await store.strReplace("loose3.md", "name: Loose Note", "name: loose3");
+  assert.equal(renamed.indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[loose3\]\(loose3\.md\) — d\n/);
+
+  await writeFile(join(root, "MEMORY.md"), "# Project memory\n\n- [x]y](xy.md) — d\n");
+  await store.create("xy.md", "---\nname: x]y\ndescription: d\nmetadata:\n  type: user\n---\n");
+  const x = await store.strReplace("xy.md", "description: d", "description: d2");
+  assert.equal(x.indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[xy\]\(xy\.md\) — d2\n/);
+});
+
+test("changing one invalid frontmatter value does not report the same problem again", async () => {
+  const { store } = await fixture();
+  await store.create("foo.md", "---\nname: bar\ndescription: d\nmetadata:\n  type: user\n---\n");
+  assert.deepEqual((await store.strReplace("foo.md", "name: bar", "name: baz")).frontmatterProblems, []);
+  assert.deepEqual((await store.strReplace("foo.md", "type: user", "type: todo")).frontmatterProblems, [
+    'metadata.type "todo" is not one of user, feedback, project, reference'
+  ]);
+  assert.deepEqual((await store.strReplace("foo.md", "type: todo", "type: other")).frontmatterProblems, []);
+  assert.deepEqual((await store.rename("foo.md", "foo-2.md")).frontmatterProblems, []);
+});
+
+test("task lists and title links are not treated as index lines", async () => {
+  const { root, store } = await fixture();
+  await writeFile(
+    join(root, "MEMORY.md"),
+    "# Project memory\n\n- [see [foo](foo.md)](bar.md) — hook\n- [ ] [task](task.md) — task\n"
+  );
+
+  assert.equal((await store.create("foo.md", "# Foo\n")).indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[foo\]\(foo\.md\) — Foo\n/);
+  assert.equal((await store.delete("foo.md")).indexed, true);
+  assert.match(
+    (await store.view("MEMORY.md")).content,
+    /- \[see \[foo\]\(foo\.md\)\]\(bar\.md\) — hook\n/
+  );
+
+  assert.equal((await store.create("task.md", "# Task\n")).indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[task\]\(task\.md\) — Task\n/);
+  assert.equal((await store.delete("task.md")).indexed, true);
+  assert.match((await store.view("MEMORY.md")).content, /- \[ \] \[task\]\(task\.md\) — task\n/);
+});
