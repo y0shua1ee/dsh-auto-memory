@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findProjectRoot, projectKey } from "../lib/paths.js";
+import { findProjectLocation, findProjectRoot, projectKey } from "../lib/paths.js";
 import { renderMemoryContext } from "../lib/render.js";
 
 test("projectKey matches the session project-directory convention", () => {
@@ -69,4 +69,27 @@ test("empty index renders an explicit marker", () => {
     maxLines: 10
   });
   assert.match(rendered.text, /\(empty index\)/);
+});
+
+test("linked worktrees share the main repository root, submodules stay separate", async () => {
+  const base = await mkdtemp(join(tmpdir(), "dsh-auto-memory-worktree-"));
+  const repo = join(base, "repo");
+  const worktree = join(repo, "wt");
+  const gitdir = join(repo, ".git", "worktrees", "wt");
+  await mkdir(gitdir, { recursive: true });
+  await mkdir(join(worktree, "src"), { recursive: true });
+  await writeFile(join(worktree, ".git"), `gitdir: ${gitdir}\n`);
+  assert.equal(await findProjectRoot(join(worktree, "src"), [".git"]), repo);
+  const location = await findProjectLocation(join(worktree, "src"), [".git"]);
+  assert.equal(location.projectRoot, repo);
+  assert.equal(location.ruleRoot, worktree);
+
+  await writeFile(join(worktree, ".git"), "gitdir: ../.git/worktrees/wt\n");
+  assert.equal(await findProjectRoot(worktree, [".git"]), repo);
+
+  const submodule = join(repo, "sub");
+  await mkdir(join(repo, ".git", "modules", "sub"), { recursive: true });
+  await mkdir(submodule, { recursive: true });
+  await writeFile(join(submodule, ".git"), `gitdir: ${join(repo, ".git", "modules", "sub")}\n`);
+  assert.equal(await findProjectRoot(submodule, [".git"]), submodule);
 });

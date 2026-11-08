@@ -18,9 +18,9 @@
 | 索引注入 | `agent/pre-step` 时读取 `MEMORY.md`，以 `<system-reminder>` 形式插入当前请求 |
 | Rules 兼容 | 读取 `~/.dsh/rules`、`~/.claude/rules`、项目 `.dsh/rules` / `.claude/rules`，支持 `paths:` 路径作用域 |
 | 去重 | 注入消息带渲染快照的 SHA-256；同一快照不重复注入，压缩后自动重注 |
-| 项目隔离 | 以最近的 `.git`（可配置）为项目根；没有标记时退回工作目录 |
-| 记忆格式 | 与 Claude Code 一致：一条记忆一个文件，带 `name` / `description` / `metadata.type` frontmatter，`[[name]]` 互链 |
-| 索引维护 | 新建/重命名/删除记忆文件时，自动增删 `MEMORY.md` 中对应的链接行；行内容取自 frontmatter，编辑后自动同步 |
+| 项目隔离 | 以最近的 `.git`（可配置）为项目根；linked worktree 归到主 checkout，submodule 保持独立；没有标记时退回工作目录 |
+| 记忆格式 | 沿用 Claude Code 的记忆文件模型：一条记忆一个文件，带 `name` / `description` / `metadata.type` frontmatter，`[[name]]` 互链；写入时自动更新 `metadata.modified` |
+| 索引维护 | 新建/重命名/删除记忆文件时，自动增删 `MEMORY.md` 中对应的链接行；行内容取自 frontmatter，编辑后自动同步；按 200 行 / 25KB 读取预算提醒或报错 |
 | 提示词引导 | 注册 `tool:memory` system-prompt section，写清该记什么、不该记什么、怎么写 |
 
 ## 目录布局
@@ -35,7 +35,7 @@
 
 ## 记忆格式
 
-格式与 Claude Code 的记忆文件相同：
+格式沿用 Claude Code 的 auto memory 模型（`type` / `modified` 兼容；`name` / `description` / `[[name]]` 是插件使用的约定）：
 
 ```markdown
 ---
@@ -52,12 +52,13 @@ metadata:
 ```
 
 - `metadata.type` 取 `user`（用户是谁）、`feedback`（对工作方式的纠正或认可）、`project`（仓库里没记录的进行中工作、目标、约束）、`reference`（外部资源指针）之一；也接受顶层 `type:`。
+- 写入带 frontmatter 的主题文件时，插件自动更新 `metadata.modified`（ISO 8601；也兼容顶层 `modified:`）。`MEMORY.md` 本身不打时间戳。
 - `feedback` 和 `project` 在正文后跟 **Why:** / **How to apply:** 两行，便于模型在边界情况自行判断。
 - `[[name]]` 指向顶层 `/memories/<name>.md`，所以只有顶层文件的 `name` 能直接解析。子目录里的记忆（如 `sub/foo.md`）即使 `name: foo` 也会提示：`[[foo]]` 指向的是 `/memories/foo.md`，不是 `sub/foo.md`；需要互链时请把记忆放在顶层，或自己在正文里写完整路径。链接到尚不存在的记忆仍然允许，表示“值得以后补写”。
 - frontmatter 不是强制的：缺字段、`name` 与文件名不一致、文件在子目录时照常写入，只在工具输出里列出问题。`create` 列出全部问题；`str_replace` / `insert` / `rename` 只列出这次改动新引入的问题**类型**，所以把一个非法值换成另一个非法值不会重复报。`name` 不是合法 kebab-case 时索引标题退回文件名；v0.3.0 遗留的非法标题（内容里的 `name` 仍是那个非法值时）会在下一次编辑或 rename 时按 legacy 标题识别并归一化。frontmatter 只解析扁平的 `key: value` 和一层 `metadata:`，不是完整 YAML。
 - 记忆文件名允许空格等空白字符；索引链接会写成 `[标题](<my note.md>)`，维护逻辑按行首链接的 target 精确匹配。说明或标题里的其他链接、`- [ ]` 任务列表不会被当成索引项。
 
-项目目录名与 DSH 的 session 目录规则一致（`--` + 路径转义 + `--`），所以 `~/.dsh/sessions/` 和 `~/.dsh/auto-memory/` 可以对照着看。
+项目目录名与 DSH 的 session 目录规则一致（`--` + 路径转义 + `--`），所以 `~/.dsh/sessions/` 和 `~/.dsh/auto-memory/` 大体可以对照着看；linked worktree 是例外，记忆键用主 checkout，以便跨 worktree 共享。
 
 ## 安装到 DSH profile
 
@@ -137,9 +138,9 @@ pnpm install --prefer-offline
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `root` | `"auto-memory"` | 记忆根目录；相对路径基于 `$DSH_HOME`，也可写绝对路径或 `~/...` |
-| `maxIndexBytes` | `25600` | 注入时 `MEMORY.md` 正文字节上限 |
-| `maxIndexLines` | `200` | 注入时 `MEMORY.md` 行数上限 |
-| `maxFileBytes` | `65536` | 单个记忆文件写入上限 |
+| `maxIndexBytes` | `25600` | `MEMORY.md` 的读取/注入字节预算；接近时提醒，超过后写入仍落盘但工具返回 `MEMORY_INDEX_OVER_LIMIT` |
+| `maxIndexLines` | `200` | `MEMORY.md` 的读取/注入行数预算；与字节预算同时生效 |
+| `maxFileBytes` | `65536` | 单个主题记忆文件的写入上限（不再限制 `MEMORY.md`；索引另有 4MiB 安全上限） |
 | `maxFiles` | `200` | 每个项目的 `.md` 文件数上限（含 `MEMORY.md`） |
 | `projectRootMarkers` | `[".git"]` | 向上查找的项目根标记；空数组表示直接用工作目录 |
 | `inject` | `true` | 是否自动注入索引 |
@@ -205,8 +206,10 @@ paths:
 ```
 
 - 没有 `paths`：会话开始后第一步注入。
-- 有 `paths`：`read` / `write` / `edit` 命中匹配文件后，下一步注入。用户规则相对当前 cwd，项目规则相对项目根。
+- 有 `paths`：`read` / `write` / `edit` 命中匹配文件后，下一步注入。用户规则相对当前 cwd，项目规则相对项目根；worktree 会话的项目规则仍锚定该 worktree 根。
 - 支持 `*`、`**`、`?`、`{a,b}`、`[abc]`；frontmatter 只读取 `paths`，其他字段忽略。
+- 语义与 Claude Code 的表格一致：`*.md` 匹配任意深度，`/*.md` 只匹配 base 根目录，`src/*.ts` 相对 base 锚定；`\[` 表示字面量 `[`，无法解析的 `[` 不匹配任何文件。`paths:` 的内联列表写坏时（缺 `]`、引号未闭合等）按“无 `paths`”加载，而不是静默失效。
+- 规则目录递归发现到 8 层；达到 `maxRules` / `maxRulesBytes` 时，注入文本会带上被省略的提示。
 - 规则内容会转义 `</system-reminder>`，注入文本明确标为背景上下文，不覆盖 system / 用户指令。
 
 因此你现有的 `~/.claude/rules/mac-config.md` 会直接对 DSH 生效，不需要在 `~/.dsh/AGENTS.md` 里再抄一份。
@@ -215,8 +218,8 @@ paths:
 
 每次 `agent/pre-step`：
 
-1. 解析当前会话工作目录，向上找 `.git`，得到项目根和 `projectKey`。
-2. 读取 `~/.dsh/auto-memory/<key>/MEMORY.md`；不存在就跳过。
+1. 解析当前会话工作目录，向上找 `.git`，得到项目根和 `projectKey`；linked worktree 归到主 checkout。
+2. 读取 `~/.dsh/auto-memory/<key>/MEMORY.md`；不存在就跳过；超过 4MiB 时只读开头。
 3. 按 `maxIndexLines` / `maxIndexBytes` 截断，转义 `</system-reminder>`，算出快照 digest。
 4. 若当前请求或会话可见 surface 里已有同 digest 的 `auto-memory` 消息，跳过。
 5. 否则在“已 claim 的历史消息之后、本轮新用户消息之前”插入一条 user-role 消息。
@@ -252,8 +255,12 @@ paths:
 
 ```bash
 cd dsh-auto-memory
-node --test test/store.test.mjs test/memory-frontmatter.test.mjs test/render-paths.test.mjs test/rules.test.mjs
+pnpm install
+pnpm build
+node --test test/store.test.mjs test/memory-frontmatter.test.mjs test/render-paths.test.mjs test/rules.test.mjs test/index-budget.test.mjs test/modified.test.mjs
 ```
+
+源码在 `src/*.ts`，`pnpm build` 由 `tsc` 编译到 `lib/*.js`（含 `.d.ts`）；`lib/` 会随包发布，直接编辑它会在下次构建时被覆盖。`pnpm test` 会先构建再跑全部测试。
 
 插件装配与注入的集成测试需要一份 DSH 运行时。先解出安装包（默认写到 `/tmp/dsh-app`，原生模块会从 `app.asar.unpacked` 合并）：
 
@@ -261,7 +268,7 @@ node --test test/store.test.mjs test/memory-frontmatter.test.mjs test/render-pat
 node scripts/extract-runtime.mjs
 
 DSH_APP_NODE_MODULES=/tmp/dsh-app/dsh/node_modules \
-  node --import ./test/register.mjs --test test/plugin.test.mjs test/rules-plugin.test.mjs
+  node --import ./test/register.mjs --test test/plugin.test.mjs test/rules-plugin.test.mjs test/worktree-plugin.test.mjs
 ```
 
 集成测试覆盖：`defineTool` 接受工具 schema、prompt section 注册、首次注入、重复 step 去重、索引变化后重注、工具增删改查、索引自动维护、子 agent 跳过、结构化错误码，以及 rules 的无条件注入、`paths` 懒加载、去重、文件变化重注、memory + rules 共存、项目外 symlink 跳过。
@@ -270,11 +277,16 @@ DSH_APP_NODE_MODULES=/tmp/dsh-app/dsh/node_modules \
 
 - 没有 `/memory` 客户端面板；查看和编辑靠工具或直接看文件。
 - 没有后台 LLM 提炼：记忆完全由模型在会话中主动写入，和 Claude Code 的 auto memory 一致。
+- 子 agent 自己的独立记忆（Claude Code 的 subagent `memory` 字段）未实现；子 agent 默认拿 `memory` 工具、不拿主会话索引。
 - Rules 只实现 `paths` 一个 frontmatter 字段，没有完整 YAML、`@import`、托管策略或 `/rules` 面板。
 - `paths` 目前只由 `read` / `write` / `edit` 触发；用 `bash cat/head` 读文件不会触发。
 - 一个 profile 一个 root；跨项目共享要自己写 `AGENTS.md` 或另开配置。
 - 依赖 DSH `0.2.1-rc.3` 到 `0.2.1-rc.5` 的内部接口（`agent/pre-step`、`agent.inbox`、`defineTool`、`systemPrompt.section`）；peer 范围是 `^0.2.1-rc.3`。DSH 升级后若接口变动，需要跟着改。
-- `MEMORY.md` 超过注入预算时只注入前 N 行/字节；完整内容要用 `memory view`。
+- `MEMORY.md` 超过 200 行 / 25KB 的读取预算时，工具返回 `MEMORY_INDEX_OVER_LIMIT`（写入已落盘），需要按错误提示重写索引；注入侧只加载前 200 行 / 25KB。索引文件超过 4MiB 时只读取开头并注入，完整内容无法通过 `memory` 工具读取。
+- 项目规则目录只看项目根（以及其中的递归子目录，最多 8 层）；子目录自己的 `.claude/rules/` 不会被发现。
+- 升级后 linked worktree 的记忆键改为主 checkout；旧版按 worktree 路径建立的记忆目录不会自动迁移，需要时手动移动内容。
+- 通用 `write` / `edit` 直接写记忆目录时不会经过 `MemoryStore`，索引维护、`modified` 和预算检查都不生效；请使用 `memory` 工具。
+- `name` 目前要求 kebab-case（沿用 DSH skill 命名）；Claude Code 目录示例里的 `user_role` 这类下划线名会收到非阻塞 warning。
 
 ## 卸载
 

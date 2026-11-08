@@ -24,6 +24,12 @@ test("rule frontmatter parses list, inline and comma forms", () => {
   const comma = parseRule("---\npaths: src/*.ts, lib/*.ts\n---\nbody\n");
   assert.deepEqual(comma.paths, ["src/*.ts", "lib/*.ts"]);
 
+  const commaBrace = parseRule("---\npaths: src/*.{ts,tsx}, lib/**/*.ts\n---\nbody\n");
+  assert.deepEqual(commaBrace.paths, ["src/*.{ts,tsx}", "lib/**/*.ts"]);
+
+  const malformed = parseRule('---\npaths: ["src/**/*.ts"\n---\nbody\n');
+  assert.equal(malformed.paths, undefined);
+
   const other = parseRule("---\ndescription: x\npaths:\n  - 'a/*.md'\n---\nbody\n");
   assert.deepEqual(other.paths, ["a/*.md"]);
 });
@@ -50,6 +56,12 @@ test("glob matching covers stars, braces, question marks and classes", () => {
   assert.equal(matchGlob("a2.ts", "a[0-9].ts"), true);
   assert.equal(matchGlob("a2.ts", "a[!0-9].ts"), false);
   assert.equal(matchGlob("src\\a.ts", "src/*.ts"), true);
+  assert.equal(matchGlob("docs/a.md", "*.md"), true);
+  assert.equal(matchGlob("a.md", "/*.md"), true);
+  assert.equal(matchGlob("docs/a.md", "/*.md"), false);
+  assert.equal(matchGlob("a/src/x.ts", "src/*.ts"), false);
+  assert.equal(matchGlob("photos [2024/x", "photos [2024/**"), false);
+  assert.equal(matchGlob("photos [2024/x", "photos \\[2024/**"), true);
   assert.equal(expandBraces("src/*.{ts,tsx}").length, 2);
   assert.deepEqual(expandBraces("a{b,c}d{e,f}").sort(), ["abde", "abdf", "acde", "acdf"]);
 });
@@ -134,4 +146,25 @@ test("renderRules groups scopes, escapes the reminder and respects the byte budg
   const truncated = renderRules(large, 700);
   assert.match(truncated.text, /omitted/);
   assert.equal(truncated.rules.length, 1);
+
+  const warned = renderRules(rules, 10_000, ["rule limit 1 reached; later rules omitted"]);
+  assert.match(warned.text, /rule limit 1 reached/);
+});
+
+test("rule discovery walks deeper than three directories", async () => {
+  const base = await mkdtemp(join(tmpdir(), "dsh-auto-memory-rules-deep-"));
+  const project = join(base, "project");
+  const deep = join(project, ".claude", "rules", "a", "b", "c", "d");
+  await mkdir(deep, { recursive: true });
+  await writeFile(join(deep, "deep.md"), "# Deep\n\ndeep rule\n");
+  const index = new RuleIndex({
+    userRuleDirs: [],
+    projectRuleDirs: [".claude/rules"],
+    maxRuleBytes: 4096,
+    maxRules: 10,
+    maxRulesBytes: 32768
+  });
+  const { rules } = await index.collect({ cwd: project, projectRoot: project });
+  assert.equal(rules.length, 1);
+  assert.match(rules[0].path, /a\/b\/c\/d\/deep\.md$/);
 });
