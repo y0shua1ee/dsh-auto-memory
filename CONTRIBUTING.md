@@ -1,17 +1,17 @@
 # Contributing
 
 1. Use Node 22 or newer and pnpm.
-2. Install and build, then run the pure tests:
+2. Install, type-check, build, and run every test:
 
    ```bash
    pnpm install
-   pnpm build
-   node --test test/store.test.mjs test/memory-frontmatter.test.mjs test/render-paths.test.mjs test/rules.test.mjs test/index-budget.test.mjs test/modified.test.mjs
+   pnpm typecheck
+   pnpm test
    ```
 
-   Source lives in `src/*.ts`; edit it and rebuild rather than editing `lib/*.js` by hand.
+   Source lives in `src/*.ts`; edit it and rebuild rather than editing `lib/*.js` by hand. The wiring tests use the installed `@deepseek-ai/*` devDependencies.
 
-3. For integration tests, extract a packaged DSH runtime first:
+3. To test against a packaged DSH runtime instead, extract it once:
 
    ```bash
    node scripts/extract-runtime.mjs

@@ -15,14 +15,7 @@
     "forceConsistentCasingInFileNames": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"],
-    "baseUrl": ".",
-    "paths": {
-      "@deepseek-ai/dsh-llm": ["types/dsh-llm.d.ts"],
-      "@deepseek-ai/dsh-tools": ["types/dsh-tools.d.ts"],
-      "@deepseek-ai/dsh-home-paths": ["types/dsh-home-paths.d.ts"],
-      "@deepseek-ai/schemastery": ["types/schemastery.d.ts"]
-    }
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "lib", "test"]

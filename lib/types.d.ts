@@ -1,8 +1,12 @@
-/** One text block in a user-role message. */
-export interface TextContent {
-    type: "text";
-    text: string;
-}
+import type { Message, UserMessage } from "@deepseek-ai/dsh-llm";
+import type { ToolDefinition, ToolExecution, ToolExecutionResult, ToolRunContext } from "@deepseek-ai/dsh-tools";
+export type { Message, UserMessage };
+/** The calling agent, derived from the tool execution surface DSH hands a tool. */
+export type Agent = NonNullable<ToolRunContext["agent"]>;
+/** The live session the plugin reads pending input and injected history from. */
+export type Session = Agent["session"];
+/** The agent-owned inbox queue used to hold a message for the next step. */
+export type Inbox = Agent["inbox"];
 /** Rule identity carried by an injected rules message. */
 export interface RuleRef {
     key: string;
@@ -10,61 +14,48 @@ export interface RuleRef {
     scope: RuleScope;
     digest: string;
 }
-/** Message metadata used to recognize and deduplicate injected snapshots. */
-export interface MessageSource {
-    kind: string;
-    form?: string;
-    projectKey?: string;
-    digest?: string;
-    baseline?: boolean;
-    rules?: RuleRef[];
-    [field: string]: unknown;
+/**
+ * Source metadata for an injected `MEMORY.md` snapshot.
+ *
+ * `MessageSourceMap` is merge-extensible by design; declaring the plugin's own
+ * kinds gives the injected messages a real type without pretending they are
+ * one of the built-in producer kinds.
+ */
+export interface AutoMemorySource {
+    readonly kind: "auto-memory";
+    readonly projectKey: string;
+    readonly digest: string;
+    readonly baseline: boolean;
 }
-/** The message shape the memory and rules features inject. */
-export interface Message {
-    id: string;
-    role?: string;
-    content: TextContent[];
-    source?: MessageSource;
+/** Source metadata for one injected batch of workspace rules. */
+export interface AutoRulesSource {
+    readonly kind: "auto-rules";
+    readonly form: "instructions";
+    readonly digest: string;
+    readonly rules: readonly RuleRef[];
 }
-/** Session surface nodes, newest last. */
-export interface Surface {
-    nodes: number[];
+declare module "@deepseek-ai/dsh-llm/message" {
+    interface MessageSourceMap {
+        "auto-memory": AutoMemorySource;
+        "auto-rules": AutoRulesSource;
+    }
 }
-/** One recorded session event. */
-export interface SessionEvent {
-    type?: string;
-    data?: Message;
-}
-/** Session header fields the plugin reads. */
-export interface SessionHeader {
-    cwd?: string;
-    origin?: string;
-    delegationDepth?: number;
-    [field: string]: unknown;
-}
-/** The session slice the plugin uses. */
-export interface Session {
-    header?: SessionHeader;
-    surface: Surface;
-    eventAt(seq: number): SessionEvent | undefined;
-}
-/** The inbox queue used to hold a message for the next step. */
-export interface Inbox {
-    nextStep: Message[];
-    prepend(queue: string, message: Message): void;
-    replace(id: string, message: Message): void;
-    remove(id: string): void;
-}
-/** The calling agent. */
-export interface Agent {
-    session: Session;
-    inbox: Inbox;
-}
+/** An injected memory snapshot, narrowed by its source kind. */
+export type AutoMemoryMessage = Message & {
+    readonly source: AutoMemorySource;
+};
+/** An injected rules batch, narrowed by its source kind. */
+export type AutoRulesMessage = Message & {
+    readonly source: AutoRulesSource;
+};
+/** Whether the loop enters the proposed step with the replacement messages. */
 export interface EnterDecision {
     kind: "enter";
-    messages: Message[];
+    messages: UserMessage[];
+    /** Start a distinct model-message series before this step's admitted messages. */
+    startsRequestSeries?: true;
 }
+/** Whether the loop rejects the proposed step. */
 export interface RejectDecision {
     kind: "reject";
 }
@@ -72,29 +63,15 @@ export type PreStepDecision = EnterDecision | RejectDecision;
 export type PreStepNext = () => Promise<PreStepDecision>;
 export interface PreStepPayload {
     agent: Agent;
-    messages: Message[];
+    messages: UserMessage[];
     step: number;
     signal: AbortSignal;
 }
 export type PreStepHandler = (payload: PreStepPayload, next: PreStepNext) => Promise<PreStepDecision>;
-/** The execution context passed to a tool body. */
-export interface ToolExec {
-    agent?: Agent;
-    signal?: AbortSignal;
-}
-/** The normalized result observed by a `tools/result` listener. */
-export interface ToolResultEvent {
-    isError?: boolean;
-}
-/** The execution record observed by a `tools/result` listener. */
-export interface ToolExecEvent {
-    name?: string;
-    arguments?: {
-        file_path?: unknown;
-    };
-    agent?: Agent;
-    signal?: AbortSignal;
-}
+/** The frozen execution record observed by a `tools/result` listener. */
+export type ToolExecEvent = Readonly<ToolExecution>;
+/** The frozen outcome observed by a `tools/result` listener. */
+export type ToolResultEvent = Readonly<ToolExecutionResult>;
 export type RuleScope = "user" | "project";
 export interface SystemPromptSection {
     name: string;
@@ -107,7 +84,7 @@ export interface Logger {
 /** The Cordis services this plugin consumes. */
 export interface PluginContext {
     tools: {
-        register(tool: unknown): void;
+        register(tool: ToolDefinition): void;
     };
     systemPrompt: {
         section(section: SystemPromptSection): void;

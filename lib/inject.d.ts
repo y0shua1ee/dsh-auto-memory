@@ -1,6 +1,6 @@
 import type { ResolvedConfig } from "./config.js";
 import type { MemoryStore } from "./store.js";
-import type { Agent, EnterDecision, Logger, Message, PreStepDecision, PreStepHandler } from "./types.js";
+import type { Agent, EnterDecision, Logger, PreStepDecision, PreStepHandler, UserMessage } from "./types.js";
 /** Message source kind used to recognize injected memory snapshots. */
 export declare const AUTO_MEMORY_SOURCE_KIND = "auto-memory";
 /** The project fields the injection path needs. */
@@ -20,7 +20,7 @@ export type ProjectFor = (agent: Agent, signal?: AbortSignal) => Promise<Injecti
  */
 export declare function hasIndexEntries(content: string): boolean;
 export declare function isSubagent(agent: Agent): boolean;
-export declare function enterWithMessage(agent: Agent, messages: Message[], decision: EnterDecision, message: Message, isManaged: (candidate: Message) => boolean): PreStepDecision;
+export declare function enterWithMessage(agent: Agent, messages: UserMessage[], decision: EnterDecision, message: UserMessage, isManaged: (candidate: UserMessage) => boolean): PreStepDecision;
 /**
  * Create the `agent/pre-step` listener that injects the project index.
  *

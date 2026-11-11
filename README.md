@@ -62,7 +62,7 @@ metadata:
 
 ## 安装到 DSH profile
 
-本包是一个 **DSH bundle**：`package.json` 声明 `dsh.bundle.patch`，安装后自动加入 profile 的 `dsh.profile.bundles`，由包内的 `cordis.patch.yml` 挂载插件行，不需要再手写 `insert`。目标版本为 DSH `0.2.1-rc.3` 及以上（已测到 `0.2.1-rc.5`）；peer 范围是 `^0.2.1-rc.3`。
+本包是一个 **DSH bundle**：`package.json` 声明 `dsh.bundle.patch`，安装后自动加入 profile 的 `dsh.profile.bundles`，由包内的 `cordis.patch.yml` 挂载插件行，不需要再手写 `insert`。目标版本为 DSH `0.2.1-rc.3` 及以上（已测到 `0.2.2-rc.1`）；peer 范围是 `^0.2.1-rc.3 || ^0.2.2-rc.1`。
 
 ### 方式 A：Plugins 页面（推荐）
 
@@ -281,7 +281,7 @@ DSH_APP_NODE_MODULES=/tmp/dsh-app/dsh/node_modules \
 - Rules 只实现 `paths` 一个 frontmatter 字段，没有完整 YAML、`@import`、托管策略或 `/rules` 面板。
 - `paths` 目前只由 `read` / `write` / `edit` 触发；用 `bash cat/head` 读文件不会触发。
 - 一个 profile 一个 root；跨项目共享要自己写 `AGENTS.md` 或另开配置。
-- 依赖 DSH `0.2.1-rc.3` 到 `0.2.1-rc.5` 的内部接口（`agent/pre-step`、`agent.inbox`、`defineTool`、`systemPrompt.section`）；peer 范围是 `^0.2.1-rc.3`。DSH 升级后若接口变动，需要跟着改。
+- 依赖 DSH `0.2.1-rc.3` 到 `0.2.2-rc.1` 的内部接口（`agent/pre-step`、`agent.inbox`、`defineTool`、`systemPrompt.section`）；peer 范围是 `^0.2.1-rc.3 || ^0.2.2-rc.1`。DSH 升级后若接口变动，需要跟着改。
 - `MEMORY.md` 超过 200 行 / 25KB 的读取预算时，工具返回 `MEMORY_INDEX_OVER_LIMIT`（写入已落盘），需要按错误提示重写索引；注入侧只加载前 200 行 / 25KB。索引文件超过 4MiB 时只读取开头并注入，完整内容无法通过 `memory` 工具读取。
 - 项目规则目录只看项目根（以及其中的递归子目录，最多 8 层）；子目录自己的 `.claude/rules/` 不会被发现。
 - 升级后 linked worktree 的记忆键改为主 checkout；旧版按 worktree 路径建立的记忆目录不会自动迁移，需要时手动移动内容。

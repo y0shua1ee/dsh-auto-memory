@@ -2,30 +2,6 @@ import { isAbsolute, join, parse, resolve } from "node:path";
 import z from "@deepseek-ai/schemastery";
 import { expandHomePath, resolveDshHome } from "@deepseek-ai/dsh-home-paths";
 
-/** Every plugin option after defaults are applied. */
-export interface ConfigShape {
-  root: string;
-  maxIndexBytes: number;
-  maxIndexLines: number;
-  maxFileBytes: number;
-  maxFiles: number;
-  projectRootMarkers: string[];
-  inject: boolean;
-  injectInSubagents: boolean;
-  guidance: boolean;
-  rules: boolean;
-  userRuleDirs: string[];
-  projectRuleDirs: string[];
-  maxRuleBytes: number;
-  maxRulesBytes: number;
-  maxRules: number;
-}
-
-/** Validated configuration with the resolved absolute memory root. */
-export interface ResolvedConfig extends ConfigShape {
-  memoryRoot: string;
-}
-
 /**
  * Plugin configuration.
  *
@@ -33,7 +9,7 @@ export interface ResolvedConfig extends ConfigShape {
  * `~`. All size limits are bytes; line limits are used only when rendering the
  * injected index, never when writing files.
  */
-export const Config: unknown = z.object({
+export const Config = z.object({
   root: z.string().default("auto-memory"),
   maxIndexBytes: z.number().step(1).min(1024).default(25600),
   maxIndexLines: z.number().step(1).min(1).default(200),
@@ -50,6 +26,14 @@ export const Config: unknown = z.object({
   maxRulesBytes: z.number().step(1).min(1024).default(131072),
   maxRules: z.number().step(1).min(1).default(100)
 });
+
+/** Every plugin option after schema defaults are applied. */
+export type ConfigShape = Schemastery.TypeT<typeof Config>;
+
+/** Validated configuration with the resolved absolute memory root. */
+export interface ResolvedConfig extends ConfigShape {
+  memoryRoot: string;
+}
 
 /** Values used when `apply` is called directly with an incomplete config. */
 export const DEFAULT_CONFIG: ConfigShape = {

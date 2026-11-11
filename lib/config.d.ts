@@ -1,25 +1,4 @@
-/** Every plugin option after defaults are applied. */
-export interface ConfigShape {
-    root: string;
-    maxIndexBytes: number;
-    maxIndexLines: number;
-    maxFileBytes: number;
-    maxFiles: number;
-    projectRootMarkers: string[];
-    inject: boolean;
-    injectInSubagents: boolean;
-    guidance: boolean;
-    rules: boolean;
-    userRuleDirs: string[];
-    projectRuleDirs: string[];
-    maxRuleBytes: number;
-    maxRulesBytes: number;
-    maxRules: number;
-}
-/** Validated configuration with the resolved absolute memory root. */
-export interface ResolvedConfig extends ConfigShape {
-    memoryRoot: string;
-}
+import z from "@deepseek-ai/schemastery";
 /**
  * Plugin configuration.
  *
@@ -27,7 +6,45 @@ export interface ResolvedConfig extends ConfigShape {
  * `~`. All size limits are bytes; line limits are used only when rendering the
  * injected index, never when writing files.
  */
-export declare const Config: unknown;
+export declare const Config: z<Schemastery.ObjectS<NoInfer<{
+    root: z<string, string, "defined">;
+    maxIndexBytes: z<number, number, "defined">;
+    maxIndexLines: z<number, number, "defined">;
+    maxFileBytes: z<number, number, "defined">;
+    maxFiles: z<number, number, "defined">;
+    projectRootMarkers: z<string[], string[], "defined">;
+    inject: z<boolean, boolean, "defined">;
+    injectInSubagents: z<boolean, boolean, "defined">;
+    guidance: z<boolean, boolean, "defined">;
+    rules: z<boolean, boolean, "defined">;
+    userRuleDirs: z<string[], string[], "defined">;
+    projectRuleDirs: z<string[], string[], "defined">;
+    maxRuleBytes: z<number, number, "defined">;
+    maxRulesBytes: z<number, number, "defined">;
+    maxRules: z<number, number, "defined">;
+}>>, Schemastery.ObjectT<NoInfer<{
+    root: z<string, string, "defined">;
+    maxIndexBytes: z<number, number, "defined">;
+    maxIndexLines: z<number, number, "defined">;
+    maxFileBytes: z<number, number, "defined">;
+    maxFiles: z<number, number, "defined">;
+    projectRootMarkers: z<string[], string[], "defined">;
+    inject: z<boolean, boolean, "defined">;
+    injectInSubagents: z<boolean, boolean, "defined">;
+    guidance: z<boolean, boolean, "defined">;
+    rules: z<boolean, boolean, "defined">;
+    userRuleDirs: z<string[], string[], "defined">;
+    projectRuleDirs: z<string[], string[], "defined">;
+    maxRuleBytes: z<number, number, "defined">;
+    maxRulesBytes: z<number, number, "defined">;
+    maxRules: z<number, number, "defined">;
+}>>, "plain">;
+/** Every plugin option after schema defaults are applied. */
+export type ConfigShape = Schemastery.TypeT<typeof Config>;
+/** Validated configuration with the resolved absolute memory root. */
+export interface ResolvedConfig extends ConfigShape {
+    memoryRoot: string;
+}
 /** Values used when `apply` is called directly with an incomplete config. */
 export declare const DEFAULT_CONFIG: ConfigShape;
 /**

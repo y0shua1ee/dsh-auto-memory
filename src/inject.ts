@@ -1,15 +1,19 @@
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import type { ContentBlock } from "@deepseek-ai/dsh-llm";
 import type { ResolvedConfig } from "./config.js";
 import { renderMemoryContext } from "./render.js";
 import type { MemoryStore } from "./store.js";
 import type {
   Agent,
+  AutoMemoryMessage,
+  AutoMemorySource,
   EnterDecision,
   Logger,
   Message,
   PreStepDecision,
   PreStepHandler,
-  PreStepPayload
+  PreStepPayload,
+  UserMessage
 } from "./types.js";
 
 /** Message source kind used to recognize injected memory snapshots. */
@@ -27,8 +31,8 @@ export interface InjectionProject {
 
 export type ProjectFor = (agent: Agent, signal?: AbortSignal) => Promise<InjectionProject>;
 
-function isAutoMemoryMessage(message: Message | undefined): boolean {
-  return message?.source?.kind === AUTO_MEMORY_SOURCE_KIND;
+function isAutoMemoryMessage(message: Message | undefined): message is AutoMemoryMessage {
+  return message?.source.kind === AUTO_MEMORY_SOURCE_KIND;
 }
 
 /**
@@ -48,13 +52,12 @@ export function hasIndexEntries(content: string): boolean {
 
 export function isSubagent(agent: Agent): boolean {
   const header = agent.session.header;
-  if (header === undefined || header === null) return false;
   return header.origin === "subagent" || (header.delegationDepth ?? 0) > 0;
 }
 
 function hasDigest(agent: Agent, decision: EnterDecision, digest: string): boolean {
   const matches = (message: Message | undefined): boolean =>
-    isAutoMemoryMessage(message) && message?.source?.digest === digest;
+    isAutoMemoryMessage(message) && message.source.digest === digest;
   if (decision.messages.some(matches)) return true;
   for (const seq of agent.session.surface.nodes) {
     const event = agent.session.eventAt(seq);
@@ -65,10 +68,10 @@ function hasDigest(agent: Agent, decision: EnterDecision, digest: string): boole
 
 export function enterWithMessage(
   agent: Agent,
-  messages: Message[],
+  messages: UserMessage[],
   decision: EnterDecision,
-  message: Message,
-  isManaged: (candidate: Message) => boolean
+  message: UserMessage,
+  isManaged: (candidate: UserMessage) => boolean
 ): PreStepDecision {
   const pending = agent.inbox.nextStep.filter(isManaged);
   if (decision.messages.length === 0) {
@@ -125,14 +128,13 @@ export function createPreStepHandler({
       });
       if (hasDigest(agent, decision, rendered.digest)) return decision;
       const message = createUserMessage({
-        content: [{ type: "text", text: rendered.text }],
+        content: [{ type: "text", text: rendered.text }] satisfies ContentBlock[],
         source: {
           kind: AUTO_MEMORY_SOURCE_KIND,
-          form: "memory",
           projectKey: project.key,
           digest: rendered.digest,
           baseline: true
-        }
+        } satisfies AutoMemorySource
       });
       return enterWithMessage(agent, messages, decision, message, isAutoMemoryMessage);
     } catch (error) {

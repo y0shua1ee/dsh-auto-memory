@@ -8,7 +8,9 @@ import { projectKey } from "../lib/paths.js";
 
 const APP_NODE_MODULES =
   process.env.DSH_APP_NODE_MODULES ?? "/tmp/dsh-app/dsh/node_modules";
-const FRAMEWORK_AVAILABLE = existsSync(join(APP_NODE_MODULES, "@deepseek-ai/dsh-llm"));
+const LOCAL_FRAMEWORK = new URL("../node_modules/@deepseek-ai/dsh-llm", import.meta.url);
+const FRAMEWORK_AVAILABLE =
+  existsSync(join(APP_NODE_MODULES, "@deepseek-ai/dsh-llm")) || existsSync(LOCAL_FRAMEWORK);
 
 function fakeInbox() {
   return {

@@ -1,4 +1,5 @@
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import type { ContentBlock } from "@deepseek-ai/dsh-llm";
 import { isAbsolute, relative, resolve } from "node:path";
 import { enterWithMessage, isSubagent } from "./inject.js";
 import type { ProjectFor } from "./inject.js";
@@ -7,6 +8,8 @@ import { RULE_MESSAGE_KIND, RuleIndex, renderRules } from "./rules.js";
 import type { Rule } from "./rules.js";
 import type {
   Agent,
+  AutoRulesMessage,
+  AutoRulesSource,
   EnterDecision,
   Logger,
   Message,
@@ -40,9 +43,10 @@ function ruleMatches(rule: Rule, touched: Set<string>, cwd: string, ruleRoot: st
 function visibleRuleDigests(agent: Agent, decision: EnterDecision): Map<string, string> {
   const visible = new Map<string, string>();
   const collect = (message: Message | undefined): void => {
-    if (message?.source?.kind !== RULE_MESSAGE_KIND) return;
-    const entries = message.source.rules;
-    if (!Array.isArray(entries)) return;
+    if (!isRulesMessage(message)) return;
+    const entries: readonly unknown[] = Array.isArray(message.source.rules)
+      ? message.source.rules
+      : [];
     for (const entry of entries) {
       if (typeof entry !== "object" || entry === null) continue;
       const candidate = entry as RuleRef;
@@ -60,8 +64,15 @@ function visibleRuleDigests(agent: Agent, decision: EnterDecision): Map<string, 
   return visible;
 }
 
-function isRulesMessage(message: Message | undefined): boolean {
-  return message?.source?.kind === RULE_MESSAGE_KIND;
+function isRulesMessage(message: Message | undefined): message is AutoRulesMessage {
+  return message?.source.kind === RULE_MESSAGE_KIND;
+}
+
+/** Read the `file_path` of a read/write/edit call from validated tool arguments. */
+function filePathOf(argumentsValue: unknown): string | undefined {
+  if (typeof argumentsValue !== "object" || argumentsValue === null) return undefined;
+  const value = (argumentsValue as { file_path?: unknown }).file_path;
+  return typeof value === "string" ? value.trim() : undefined;
 }
 
 /**
@@ -89,19 +100,19 @@ export function createRulesFeature({
   const touched = new WeakMap<object, Set<string>>();
 
   const toolResult = (exec: ToolExecEvent, result: ToolResultEvent): void => {
-    if (result?.isError) return;
-    if (!FILE_TOOLS.has(exec?.name ?? "")) return;
+    if (result.isError) return;
+    if (!FILE_TOOLS.has(exec.name)) return;
     const agent = exec.agent;
     if (agent === undefined) return;
     if (!config.injectInSubagents && isSubagent(agent)) return;
-    const raw = exec.arguments?.file_path;
-    if (typeof raw !== "string" || raw.trim().length === 0) return;
+    const raw = filePathOf(exec.arguments);
+    if (raw === undefined || raw.length === 0) return;
     let paths = touched.get(agent.session);
     if (paths === undefined) {
       paths = new Set();
       touched.set(agent.session, paths);
     }
-    paths.add(raw.trim());
+    paths.add(raw);
   };
 
   const preStep = async ({ agent, messages, signal }: PreStepPayload, next: () => Promise<PreStepDecision>): Promise<PreStepDecision> => {
@@ -127,7 +138,7 @@ export function createRulesFeature({
       const rendered = renderRules(fresh, config.maxRulesBytes, warnings);
       if (rendered === undefined) return decision;
       const message = createUserMessage({
-        content: [{ type: "text", text: rendered.text }],
+        content: [{ type: "text", text: rendered.text }] satisfies ContentBlock[],
         source: {
           kind: RULE_MESSAGE_KIND,
           form: "instructions",
@@ -138,7 +149,7 @@ export function createRulesFeature({
             scope: rule.scope,
             digest: rule.digest
           }))
-        }
+        } satisfies AutoRulesSource
       });
       return enterWithMessage(agent, messages, decision, message, isRulesMessage);
     } catch (error) {

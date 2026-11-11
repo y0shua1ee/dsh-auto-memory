@@ -1,10 +1,18 @@
+import type { ContentBlock } from "@deepseek-ai/dsh-llm";
+import type {
+  DefineToolOptions,
+  InferArgs,
+  InferValue,
+  ParameterSchemaSpec,
+  ToolCallView,
+  ToolRunContext,
+  ValueSchemaSpec
+} from "@deepseek-ai/dsh-tools";
 import { INDEX_FILE, MemoryError, MemoryStore, VIRTUAL_ROOT } from "./store.js";
 import type { ListEntry, ViewResult } from "./store.js";
-import type { Agent, TextContent, ToolExec } from "./types.js";
+import type { Agent } from "./types.js";
 
 const COMMANDS = ["view", "create", "str_replace", "insert", "delete", "rename"] as const;
-
-type MemoryCommand = (typeof COMMANDS)[number];
 
 /** A project resolved for the calling session. */
 export interface MemoryProject {
@@ -13,51 +21,81 @@ export interface MemoryProject {
 
 export type ProjectFor = (agent: Agent, signal?: AbortSignal) => Promise<MemoryProject>;
 
-export interface MemoryToolArgs {
-  command: MemoryCommand;
-  path?: unknown;
-  file_text?: unknown;
-  old_str?: unknown;
-  new_str?: unknown;
-  insert_line?: unknown;
-  insert_text?: unknown;
-  new_path?: unknown;
-  numbered?: unknown;
-}
+const MEMORY_PARAMETERS = {
+  command: {
+    type: "string",
+    required: true,
+    enum: COMMANDS,
+    description: "Operation to perform."
+  },
+  path: {
+    type: "string",
+    description: `Virtual path such as ${VIRTUAL_ROOT}/${INDEX_FILE} or ${VIRTUAL_ROOT}/prefer-pnpm.md. Required for every command except a root view.`
+  },
+  file_text: {
+    type: "string",
+    description:
+      "For create: the complete file content. A memory file starts with ---, name: <kebab-case>, description: <one line>, metadata:, type: <user|feedback|project|reference> (indented), ---, then the body. Creating MEMORY.md with empty text writes the standard index header."
+  },
+  old_str: {
+    type: "string",
+    description: "For str_replace: text that must occur exactly once in the file."
+  },
+  new_str: {
+    type: "string",
+    description: "For str_replace: replacement text; omit or pass an empty string to delete the matched text."
+  },
+  insert_line: {
+    type: "number",
+    description: "For insert: zero-based line index at which to insert; 0 inserts before the first line."
+  },
+  insert_text: {
+    type: "string",
+    description: "For insert: text to insert as one or more lines."
+  },
+  new_path: {
+    type: "string",
+    description: "For rename: the destination virtual path."
+  },
+  numbered: {
+    type: "boolean",
+    description: "For view of a file: prefix each line with its 1-based line number."
+  }
+} as const satisfies ParameterSchemaSpec;
 
-export interface MemoryToolResult {
-  ok: true;
-  output: string;
-  path?: string;
-  changed?: boolean;
-  bytes?: number;
-  lines?: number;
-  entries?: ListEntry[];
-}
+const MEMORY_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ok: { type: "boolean", required: true },
+    output: { type: "string", required: true },
+    path: { type: "string" },
+    changed: { type: "boolean" },
+    bytes: { type: "number" },
+    lines: { type: "number" },
+    entries: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          path: { type: "string", required: true },
+          kind: { type: "string", required: true, enum: ["file", "directory"] },
+          bytes: { type: "number", required: true }
+        }
+      }
+    }
+  }
+} as const satisfies ValueSchemaSpec;
 
-interface ToolParameter {
-  type: string;
-  required?: boolean;
-  enum?: readonly string[];
-  description?: string;
-}
+export type MemoryToolArgs = InferArgs<typeof MEMORY_PARAMETERS>;
 
-export interface MemoryToolOptions {
-  name: string;
-  description: string;
-  parameters: Record<string, ToolParameter>;
-  output: {
-    schema: Record<string, unknown>;
-    render: (args: MemoryToolArgs, value: MemoryToolResult) => TextContent[];
-  };
-  presentCall: (args: MemoryToolArgs) => {
-    card: string;
-    title: string;
-    kind: string;
-    rawInput: string;
-  };
-  execute: (args: Record<string, unknown>, exec?: ToolExec) => Promise<MemoryToolResult>;
-}
+export type MemoryToolResult = InferValue<typeof MEMORY_OUTPUT_SCHEMA>;
+
+export type MemoryToolOptions = DefineToolOptions<
+  typeof MEMORY_PARAMETERS,
+  typeof MEMORY_OUTPUT_SCHEMA
+>;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -163,88 +201,25 @@ export function buildMemoryToolOptions({ projectFor }: { projectFor: ProjectFor 
       "Use view to list or read, create for a new .md file, str_replace to change exactly one occurrence, insert to add lines, delete to remove a file, and rename to move one. " +
       "Each memory file holds one fact, is named <name>.md, and starts with frontmatter: name, description, and metadata.type (user, feedback, project, or reference). " +
       "Save durable preferences, corrections, decisions, constraints, and pitfalls; never save secrets or transient task state.",
-    parameters: {
-      command: {
-        type: "string",
-        required: true,
-        enum: COMMANDS,
-        description: "Operation to perform."
-      },
-      path: {
-        type: "string",
-        description: `Virtual path such as ${VIRTUAL_ROOT}/${INDEX_FILE} or ${VIRTUAL_ROOT}/prefer-pnpm.md. Required for every command except a root view.`
-      },
-      file_text: {
-        type: "string",
-        description:
-          "For create: the complete file content. A memory file starts with ---, name: <kebab-case>, description: <one line>, metadata:, type: <user|feedback|project|reference> (indented), ---, then the body. Creating MEMORY.md with empty text writes the standard index header."
-      },
-      old_str: {
-        type: "string",
-        description: "For str_replace: text that must occur exactly once in the file."
-      },
-      new_str: {
-        type: "string",
-        description: "For str_replace: replacement text; omit or pass an empty string to delete the matched text."
-      },
-      insert_line: {
-        type: "number",
-        description: "For insert: zero-based line index at which to insert; 0 inserts before the first line."
-      },
-      insert_text: {
-        type: "string",
-        description: "For insert: text to insert as one or more lines."
-      },
-      new_path: {
-        type: "string",
-        description: "For rename: the destination virtual path."
-      },
-      numbered: {
-        type: "boolean",
-        description: "For view of a file: prefix each line with its 1-based line number."
-      }
-    },
+    parameters: MEMORY_PARAMETERS,
     output: {
-      schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          ok: { type: "boolean", required: true },
-          output: { type: "string", required: true },
-          path: { type: "string" },
-          changed: { type: "boolean" },
-          bytes: { type: "number" },
-          lines: { type: "number" },
-          entries: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                path: { type: "string", required: true },
-                kind: { type: "string", required: true, enum: ["file", "directory"] },
-                bytes: { type: "number", required: true }
-              }
-            }
-          }
-        }
-      },
-      render: (_args: MemoryToolArgs, value: MemoryToolResult): TextContent[] => [
+      schema: MEMORY_OUTPUT_SCHEMA,
+      render: (_args: MemoryToolArgs, value: MemoryToolResult): ContentBlock[] => [
         { type: "text", text: value.output }
       ]
     },
-    presentCall: (args: MemoryToolArgs) => ({
+    presentCall: (args: MemoryToolArgs): ToolCallView => ({
       card: "generic",
       title: args.command === "view" ? "Read project memory" : `${args.command} project memory`,
       kind: args.command === "view" ? "read" : "other",
       rawInput: typeof args.path === "string" ? args.path : VIRTUAL_ROOT
     }),
-    execute: async (args: Record<string, unknown>, exec?: ToolExec): Promise<MemoryToolResult> => {
-      const agent = exec?.agent;
+    execute: async (args: MemoryToolArgs, exec: ToolRunContext): Promise<MemoryToolResult> => {
+      const agent = exec.agent;
       if (agent === undefined) {
         throw new MemoryError("memory requires a calling agent", "MEMORY_NO_AGENT");
       }
-      const project = await projectFor(agent, exec?.signal);
+      const project = await projectFor(agent, exec.signal);
       const store = project.store;
       const command = args.command;
       if (command === "view") {
@@ -288,11 +263,12 @@ export function buildMemoryToolOptions({ projectFor }: { projectFor: ProjectFor 
         };
       }
       if (command === "insert") {
-        if (!Number.isSafeInteger(args.insert_line)) {
+        const insertLine = args.insert_line;
+        if (typeof insertLine !== "number" || !Number.isSafeInteger(insertLine)) {
           throw new MemoryError("insert_line must be a non-negative integer", "MEMORY_INVALID_ARGUMENT");
         }
         const insertText = requireString(args.insert_text, "insert_text");
-        const result = await store.insert(relativePath, args.insert_line as number, insertText);
+        const result = await store.insert(relativePath, insertLine, insertText);
         return {
           ok: true,
           output: [

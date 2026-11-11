@@ -1,5 +1,6 @@
 import { HarnessError } from "@deepseek-ai/dsh-llm";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+import type { ToolRunContext } from "@deepseek-ai/dsh-tools";
 import { Config, resolveConfig } from "./config.js";
 import type { ConfigShape, ResolvedConfig } from "./config.js";
 import { buildGuidance } from "./guidance.js";
@@ -8,6 +9,7 @@ import { createRulesFeature } from "./rules-inject.js";
 import { displayPath, findProjectLocation, memoryDirectory, projectKey } from "./paths.js";
 import { MemoryError, MemoryStore } from "./store.js";
 import { buildMemoryToolOptions } from "./tool.js";
+import type { MemoryToolArgs, MemoryToolResult } from "./tool.js";
 import type { Agent, PluginContext } from "./types.js";
 
 export { Config, resolveConfig };
@@ -97,7 +99,7 @@ export function apply(ctx: PluginContext, config?: Partial<ConfigShape>): void {
   ctx.tools.register(
     defineTool({
       ...options,
-      execute: async (args: Record<string, unknown>, exec?: Parameters<typeof options.execute>[1]) => {
+      execute: async (args: MemoryToolArgs, exec: ToolRunContext): Promise<MemoryToolResult> => {
         try {
           return await options.execute(args, exec);
         } catch (error) {

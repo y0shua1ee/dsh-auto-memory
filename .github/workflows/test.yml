@@ -22,15 +22,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - name: Pure tests
-        run: >-
-          node --test
-          test/store.test.mjs
-          test/memory-frontmatter.test.mjs
-          test/render-paths.test.mjs
-          test/rules.test.mjs
-          test/index-budget.test.mjs
-          test/modified.test.mjs
-      - name: Integration tests (skipped without a DSH runtime)
-        run: node --test test/plugin.test.mjs test/rules-plugin.test.mjs test/worktree-plugin.test.mjs
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Ensure committed lib matches src
+        run: git diff --exit-code -- lib
